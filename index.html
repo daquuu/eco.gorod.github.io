@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ЭКО город</title>
+<style>
+  :root {
+    --bg: #edf2ed;
+    --card: #ffffff;
+    --ink: #15231a;
+    --muted: #66786c;
+    --line: #dce6dd;
+    --moss: #2f6b47;
+    --moss-d: #1f4d33;
+    --mint: #e6f1e8;
+    --leaf: #8fd16a;
+    --r: 18px;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; }
+  body {
+    background-color: var(--bg);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140' viewBox='0 0 140 140'%3E%3Cg fill='%232f6b47' fill-opacity='0.07'%3E%3Cpath d='M16 46C16 26 28 14 50 14c0 21-12 33-34 32z'/%3E%3Cpath d='M92 92C92 72 104 60 126 60c0 21-12 33-34 32z' transform='rotate(55 109 76)'/%3E%3Cpath d='M44 130C44 112 55 101 75 101c0 19-11 30-31 29z' transform='rotate(-35 59 115)'/%3E%3C/g%3E%3C/svg%3E");
+    background-size: 140px 140px;
+    color: var(--ink);
+    font: 15px/1.4 "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  button, input { font: inherit; color: inherit; }
+
+  /* ---------- Иконки (нарисованы в SVG, линия 1.8) ---------- */
+  .ic {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  /* ---------- Сетка: слева меню, по центру карта, справа баллы ---------- */
+  .app {
+    display: grid;
+    grid-template-columns: clamp(250px, 22vw, 320px) minmax(0, 1fr) clamp(250px, 22vw, 320px);
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas:
+      "brand map points"
+      "menu  map points";
+    gap: 14px;
+    padding: 14px;
+    height: 100vh;
+    height: 100dvh;
+  }
+  .brand  { grid-area: brand; }
+  .menu   { grid-area: menu; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+  .points { grid-area: points; align-self: start; }
+  .map-card {
+    grid-area: map;
+    position: relative;
+    overflow: hidden;
+    min-height: 360px;
+    border-radius: 22px;
+    border: 1px solid var(--line);
+    background: #dfe6df;
+  }
+  .map-card iframe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    display: block;
+  }
+
+  /* ---------- Логотип ---------- */
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 4px 4px 6px;
+  }
+  .logo {
+    width: 46px;
+    height: 46px;
+    border-radius: 14px;
+    background: var(--moss);
+    color: #fff;
+    display: grid;
+    place-items: center;
+    flex: none;
+  }
+  .logo svg { width: 28px; height: 28px; }
+  .brand h1 { margin: 0; font-size: 21px; font-weight: 800; letter-spacing: -0.01em; }
+  .brand p  { margin: 2px 0 0; font-size: 13px; color: var(--muted); }
+
+  /* ---------- Открывающиеся окошки (Рейтинг, Профиль) ---------- */
+  .win {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    flex: none;
+  }
+  .win summary {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 62px;
+    padding: 12px 14px;
+    list-style: none;
+    cursor: pointer;
+    border-radius: var(--r);
+  }
+  .win summary::-webkit-details-marker { display: none; }
+  .win summary:focus-visible { outline: 2px solid var(--moss); outline-offset: 2px; }
+  .win[open] summary { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+  .tile {
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+    background: var(--mint);
+    color: var(--moss);
+    display: grid;
+    place-items: center;
+    flex: none;
+  }
+  .tile svg { width: 22px; height: 22px; }
+  .ttl { flex: 1; font-size: 16px; font-weight: 650; }
+  .hint {
+    max-width: 90px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .chev { width: 20px; height: 20px; flex: none; color: var(--muted); transition: transform 0.2s; }
+  .win[open] .chev { transform: rotate(180deg); }
+  .body { padding: 2px 14px 16px; }
+
+  /* ---------- Рейтинг ---------- */
+  .place { margin: 2px 0 8px; font-size: 13px; color: var(--muted); }
+  .list { list-style: none; margin: 0; padding: 0; }
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 6px;
+    border-radius: 12px;
+  }
+  .row + .row { border-top: 1px solid var(--line); }
+  .row.me { background: var(--mint); border-top-color: transparent; }
+  .row.me + .row { border-top-color: transparent; }
+  .rank {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    flex: none;
+    background: #f1f4f1;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .r1 { background: #f7e8a6; color: #6b5400; }
+  .r2 { background: #e3e8ea; color: #47535c; }
+  .r3 { background: #f1d6c1; color: #6a3b1b; }
+  .av { width: 36px; height: 36px; border-radius: 50%; flex: none; display: block; }
+  .who {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 2px 8px;
+    min-width: 0;
+  }
+  .nm {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 600;
+  }
+  .pts {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 9px 2px 7px;
+    border-radius: 999px;
+    background: var(--mint);
+    color: var(--moss-d);
+    font-size: 13px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .pts svg { width: 13px; height: 13px; }
+  .row.me .pts { background: #fff; }
+
+  /* ---------- Профиль ---------- */
+  .pav {
+    display: block;
+    width: 92px;
+    height: 92px;
+    margin: 6px auto 14px;
+    border-radius: 50%;
+    border: 3px solid var(--mint);
+  }
+  .field { display: block; margin: 16px 0 6px; font-size: 14px; font-weight: 650; }
+  .input {
+    width: 100%;
+    min-height: 48px;
+    padding: 0 14px;
+    border: 1.5px solid var(--line);
+    border-radius: 12px;
+    background: #fff;
+    font-size: 16px;
+  }
+  .input:focus { outline: none; border-color: var(--moss); box-shadow: 0 0 0 3px var(--mint); }
+
+  /* ---------- Баллы (справа) ---------- */
+  .points {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    padding: 16px;
+  }
+  .p-head { display: flex; align-items: center; gap: 12px; }
+  .score {
+    margin: 16px 0 14px;
+    padding: 16px;
+    border-radius: 14px;
+    background: var(--mint);
+  }
+  .score b {
+    display: block;
+    font-size: 56px;
+    line-height: 1;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--moss-d);
+    font-variant-numeric: tabular-nums;
+  }
+  .score span { font-size: 13px; color: var(--muted); }
+
+  .btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 54px;
+    padding: 0 16px;
+    border: 0;
+    border-radius: 14px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn svg { width: 22px; height: 22px; flex: none; }
+  .btn-primary { background: var(--moss); color: #fff; }
+  .btn-primary:hover { background: var(--moss-d); }
+  .btn-primary:disabled { background: #a9bcae; cursor: default; }
+  .btn:focus-visible, .btn-ghost:focus-within { outline: 2px solid var(--moss); outline-offset: 2px; }
+  .btn-ghost {
+    min-height: 48px;
+    background: #fff;
+    color: var(--moss-d);
+    border: 1.5px dashed #9bbba6;
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .btn-ghost:hover { background: var(--mint); }
+  .file { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+  .cool { height: 4px; margin-top: 8px; border-radius: 4px; background: var(--mint); overflow: hidden; }
+  .cool i { display: block; width: 0; height: 100%; background: var(--leaf); transition: width 1s linear; }
+  .sep { height: 1px; margin: 18px 0 14px; background: var(--line); }
+  .label { margin: 0 0 8px; font-size: 14px; font-weight: 650; }
+  .proof {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .proof[hidden] { display: none; }
+  .proof img { width: 44px; height: 44px; border-radius: 10px; object-fit: cover; }
+  .proof span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ---------- Телефон и узкие экраны: всё друг под другом ---------- */
+  @media (max-width: 980px) {
+    .app {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: none;
+      grid-template-areas:
+        "brand"
+        "map"
+        "points"
+        "menu";
+      height: auto;
+      min-height: 100vh;
+      min-height: 100dvh;
+    }
+    .map-card { height: 62vh; height: 62dvh; min-height: 340px; }
+    .menu { overflow: visible; }
+    .list { max-height: 55vh; overflow-y: auto; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Наши иконки -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="i-leaf" viewBox="0 0 24 24"><path d="M5 19C5 10 10 5 19 5c0 9-5 14-14 14z"/><path d="M5 19l8-8"/></symbol>
+  <symbol id="i-podium" viewBox="0 0 24 24"><rect x="3.5" y="12" width="5" height="8" rx="1.2"/><rect x="9.5" y="5" width="5" height="15" rx="1.2"/><rect x="15.5" y="9" width="5" height="11" rx="1.2"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c.5-3.8 3.2-6 7-6s6.5 2.2 7 6"/></symbol>
+  <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8.5h3L8.5 6h7L17 8.5h3V19H4z"/><circle cx="12" cy="13.5" r="3.2"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5"/></symbol>
+</svg>
+
+<div class="app">
+
+  <!-- Слева сверху: название -->
+  <header class="brand">
+    <div class="logo"><svg class="ic"><use href="#i-leaf"/></svg></div>
+    <div>
+      <h1>ЭКО город</h1>
+      <p>Помогай городу и получай баллы</p>
+    </div>
+  </header>
+
+  <!-- Слева: открывающиеся окошки -->
+  <nav class="menu">
+    <details class="win" name="menu" id="win-rating">
+      <summary>
+        <span class="tile"><svg class="ic"><use href="#i-podium"/></svg></span>
+        <span class="ttl">Рейтинг</span>
+        <span class="hint" id="hint-place"></span>
+        <svg class="ic chev"><use href="#i-chev"/></svg>
+      </summary>
+      <div class="body">
+        <p class="place" id="my-place"></p>
+        <ol class="list" id="leaderboard"></ol>
+      </div>
+    </details>
+
+    <details class="win" name="menu">
+      <summary>
+        <span class="tile"><svg class="ic"><use href="#i-user"/></svg></span>
+        <span class="ttl">Профиль</span>
+        <span class="hint" id="hint-nick"></span>
+        <svg class="ic chev"><use href="#i-chev"/></svg>
+      </summary>
+      <div class="body">
+        <img class="pav" id="my-avatar" width="92" height="92" alt="Аватар">
+        <label class="btn btn-ghost">
+          <svg class="ic"><use href="#i-camera"/></svg>
+          Загрузить аватар
+          <input class="file" type="file" id="avatar-input" accept="image/*">
+        </label>
+        <label class="field" for="nickname-input">Изменить ник</label>
+        <input class="input" type="text" id="nickname-input" maxlength="20" placeholder="Ваш ник" autocomplete="off" autocapitalize="off">
+      </div>
+    </details>
+  </nav>
+
+  <!-- По центру: карта (код вставки Яндекса) -->
+  <main class="map-card">
+    <iframe src="https://yandex.ru/map-widget/v1/?azimuth=0.012350288502464456&ll=37.583152%2C55.565541&mode=poi&poi%5Bpoint%5D=37.582387%2C55.566214&poi%5Buri%5D=ymapsbm1%3A%2F%2Forg%3Foid%3D1035775289&z=17.25" width="560" height="400" frameborder="0" allowfullscreen="true" title="Карта"></iframe>
+  </main>
+
+  <!-- Справа: баллы и кнопка «Я помог своему городу» -->
+  <aside class="points">
+    <div class="p-head">
+      <span class="tile"><svg class="ic"><use href="#i-leaf"/></svg></span>
+      <span class="ttl">Ваши баллы</span>
+    </div>
+
+    <div class="score">
+      <b id="score">0</b>
+      <span>ЭКО баллов</span>
+    </div>
+
+    <button class="btn btn-primary" type="button" id="help-city">
+      <svg class="ic"><use href="#i-leaf"/></svg>
+      <span id="help-label">Я помог своему городу</span>
+    </button>
+    <div class="cool"><i id="cool-fill"></i></div>
+
+    <div class="sep"></div>
+
+    <p class="label">Выслать доказательства:</p>
+    <label class="btn btn-ghost">
+      <svg class="ic"><use href="#i-camera"/></svg>
+      Загрузить фото для проверки
+      <input class="file" type="file" id="proof-input" accept="image/*">
+    </label>
+    <div class="proof" id="proof-box" hidden>
+      <img id="proof-thumb" alt="">
+      <span id="proof-name"></span>
+    </div>
+  </aside>
+
+</div>
+
+<script>
+  // ---------- Данные ----------
+  var score = 0;
+  var players = [
+    { name: 'alex-55',     score: 210, color: '#4f86a3' },
+    { name: 'maria_k',     score: 185, color: '#b0607f' },
+    { name: 'dasha_green', score: 160, color: '#5a9c63' },
+    { name: 'kirill.77',   score: 140, color: '#8b6fb0' },
+    { name: 'ivan.eco',    score: 125, color: '#c0803f' },
+    { name: 'olga89',      score: 90,  color: '#c28a2c' },
+    { name: 'sonya_22',    score: 70,  color: '#3f9a94' },
+    { name: 'nikita-eco',  score: 45,  color: '#a0563f' }
+  ];
+  var me = { name: 'Вы', score: 0, color: '#8a9a8e', avatar: null };
+  players.push(me);
+
+  function $(id) { return document.getElementById(id); }
+
+  // ---------- Аватарки ----------
+  function escapeXml(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  // Круглая аватарка с буквой для игроков без фото
+  function letterAvatar(p) {
+    var letter = escapeXml(p.name.charAt(0).toUpperCase());
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96">' +
+      '<circle cx="48" cy="48" r="48" fill="' + p.color + '"/>' +
+      '<text x="48" y="65" font-size="48" font-family="Arial,sans-serif" font-weight="bold" ' +
+      'text-anchor="middle" fill="#ffffff">' + letter + '</text></svg>';
+    return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  }
+
+  function avatarSrc(p) {
+    return p.avatar ? p.avatar : letterAvatar(p);
+  }
+
+  // Делаем загруженное фото круглым и квадратным по центру
+  function makeRound(dataUrl, done) {
+    var img = new Image();
+    img.onload = function () {
+      var size = 128;
+      var c = document.createElement('canvas');
+      c.width = size;
+      c.height = size;
+      var ctx = c.getContext('2d');
+      ctx.beginPath();
+      ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.clip();
+      var m = Math.min(img.width, img.height);
+      ctx.drawImage(img, (img.width - m) / 2, (img.height - m) / 2, m, m, 0, 0, size, size);
+      done(c.toDataURL('image/png'));
+    };
+    img.src = dataUrl;
+  }
+
+  // ---------- Баллы ----------
+  function renderScore() {
+    $('score').textContent = score;
+  }
+
+  // ---------- Рейтинг: вертикальный список, баллы рядом с ником ----------
+  var LEAF_MINI = '<svg class="ic"><use href="#i-leaf"/></svg>';
+
+  function renderRating() {
+    me.score = score;
+    var sorted = players.slice().sort(function (a, b) { return b.score - a.score; });
+    var list = $('leaderboard');
+    list.innerHTML = '';
+
+    sorted.forEach(function (p, i) {
+      var li = document.createElement('li');
+      li.className = 'row' + (p === me ? ' me' : '');
+
+      var rank = document.createElement('span');
+      rank.className = 'rank' + (i < 3 ? ' r' + (i + 1) : '');
+      rank.textContent = i + 1;
+
+      var img = document.createElement('img');
+      img.className = 'av';
+      img.src = avatarSrc(p);
+      img.width = 36;
+      img.height = 36;
+      img.alt = '';
+
+      var who = document.createElement('span');
+      who.className = 'who';
+      var nm = document.createElement('span');
+      nm.className = 'nm';
+      nm.textContent = p.name;
+      var pts = document.createElement('span');
+      pts.className = 'pts';
+      pts.innerHTML = LEAF_MINI + p.score;
+      who.appendChild(nm);
+      who.appendChild(pts);
+
+      li.appendChild(rank);
+      li.appendChild(img);
+      li.appendChild(who);
+      list.appendChild(li);
+
+      if (p === me) {
+        $('my-place').textContent = 'Ваше место: ' + (i + 1) + ' из ' + sorted.length;
+        $('hint-place').textContent = (i + 1) + ' место';
+      }
+    });
+  }
+
+  // ---------- Кнопка «Я помог своему городу» (+5 баллов, пауза 1 минута) ----------
+  var helpBtn = $('help-city');
+  var helpLabel = $('help-label');
+  var coolFill = $('cool-fill');
+  var helpText = helpLabel.textContent;
+  var cooldownMs = 60 * 1000;
+  var cooldownEnd = 0;
+  var cooldownTimer = null;
+
+  function updateCooldown() {
+    var left = cooldownEnd - Date.now();
+    if (left <= 0) {
+      helpBtn.disabled = false;
+      helpLabel.textContent = helpText;
+      coolFill.style.width = '0%';
+      clearInterval(cooldownTimer);
+      cooldownTimer = null;
+      return;
+    }
+    helpBtn.disabled = true;
+    helpLabel.textContent = 'Подождите ' + Math.ceil(left / 1000) + ' сек';
+    coolFill.style.width = (left / cooldownMs * 100) + '%';
+  }
+
+  helpBtn.addEventListener('click', function () {
+    score += 5;
+    renderScore();
+    renderRating();
+    cooldownEnd = Date.now() + cooldownMs;
+    coolFill.style.width = '100%';
+    updateCooldown();
+    cooldownTimer = setInterval(updateCooldown, 1000);
+  });
+
+  // ---------- Фото для проверки ----------
+  $('proof-input').addEventListener('change', function (e) {
+    var f = e.target.files[0];
+    if (!f) return;
+    $('proof-name').textContent = f.name;
+    $('proof-thumb').src = URL.createObjectURL(f);
+    $('proof-box').hidden = false;
+  });
+
+  // ---------- Профиль: аватар и ник ----------
+  function renderMyAvatar() {
+    $('my-avatar').src = avatarSrc(me);
+    $('hint-nick').textContent = me.name;
+  }
+
+  $('avatar-input').addEventListener('change', function (e) {
+    var f = e.target.files[0];
+    if (!f) return;
+    var reader = new FileReader();
+    reader.onload = function (ev) {
+      makeRound(ev.target.result, function (round) {
+        me.avatar = round;
+        renderMyAvatar();
+        renderRating();
+      });
+    };
+    reader.readAsDataURL(f);
+  });
+
+  $('nickname-input').addEventListener('input', function (e) {
+    me.name = e.target.value.trim() || 'Вы';
+    renderMyAvatar();
+    renderRating();
+  });
+
+  // ---------- Старт ----------
+  renderScore();
+  renderRating();
+  renderMyAvatar();
+
+  // На компьютере рейтинг сразу раскрыт, на телефоне - закрыт
+  if (window.matchMedia('(min-width: 981px)').matches) {
+    $('win-rating').open = true;
+  }
+</script>
+</body>
+</html>
